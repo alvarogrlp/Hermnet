@@ -27,14 +27,19 @@ public class AuthChallenge {
      * Used as the Primary Key.
      */
     @Id
-    private String challenge;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "challenge_id")
+    private Long challengeId;
+
+    @Column(name = "nonce", nullable = false, length = 64)
+    private String nonce;
 
     /**
      * The user associated with this challenge.
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @JoinColumn(name = "user_hash", referencedColumnName = "id_hash", nullable = false)
+    private User userHash;
 
     /**
      * The timestamp when this challenge expires.

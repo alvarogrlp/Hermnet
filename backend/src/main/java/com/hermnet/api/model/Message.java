@@ -22,7 +22,8 @@ public class Message {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(name = "message_id")
+    private Long messageId;
 
     /**
      * The ID of the user who will receive this message.

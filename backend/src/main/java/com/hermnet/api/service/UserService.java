@@ -66,7 +66,7 @@ public class UserService {
 
         // Create new user entity
         User newUser = User.builder()
-                .id(id)
+                .idHash(id)
                 .publicKey(publicKey)
                 .build();
 
