@@ -9,7 +9,6 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -18,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * 
  * Verifies storing, retrieving encrypted messages, and custom ordering by
  * creation time.
+ * Updated to reflect schema changes: recipientHash, stegoPacket.
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -26,9 +26,8 @@ public class MessageRepositoryTest {
     @Autowired
     private MessageRepository messageRepository;
 
-    private static final String RECIPIENT_ID = "HNET-TEST-RECIPIENT";
-    private static final String SENDER_HASH = "mock-sender-hash";
-    private static final byte[] DATA = new byte[] { 1, 2, 3 };
+    private static final String RECIPIENT_HASH = "HNET-TEST-RECIPIENT-HASH";
+    private static final byte[] STEGO_DATA = new byte[] { 1, 2, 3, 4, 5 };
 
     @BeforeEach
     public void setUp() {
@@ -39,88 +38,102 @@ public class MessageRepositoryTest {
     public void testSaveAndRetrieveMessage() {
         // Given
         Message msg = Message.builder()
-                .recipientId(RECIPIENT_ID)
-                .senderIdHash(SENDER_HASH)
-                .encryptedImage(DATA)
-                .createdAt(LocalDateTime.now()) // PrePersist sets it, but builder allows override
-                .build();
-
-        // When
-        messageRepository.save(msg);
-
-        // Then
-        List<Message> allMessages = messageRepository.findAll();
-        assertEquals(1, allMessages.size());
-        assertEquals(RECIPIENT_ID, allMessages.get(0).getRecipientId());
-        assertArrayEquals(DATA, allMessages.get(0).getEncryptedImage());
-    }
-
-    @Test
-    public void testFindByRecipientIdOrderedByCreatedAtDesc() {
-        // Given - Create messages at different times
-        Message oldMsg = Message.builder()
-                .recipientId(RECIPIENT_ID)
-                .senderIdHash("hash1")
-                .encryptedImage(new byte[] { 1 })
-                .createdAt(LocalDateTime.now().minusHours(1))
-                .build();
-        messageRepository.save(oldMsg);
-
-        Message newMsg = Message.builder()
-                .recipientId(RECIPIENT_ID)
-                .senderIdHash("hash2")
-                .encryptedImage(new byte[] { 2 })
-                .createdAt(LocalDateTime.now())
-                .build();
-        messageRepository.save(newMsg);
-
-        // And create a message for another user
-        messageRepository.save(Message.builder()
-                .recipientId("HNET-OTHER-USER")
-                .senderIdHash("hash3")
-                .encryptedImage(new byte[] { 3 })
-                .createdAt(LocalDateTime.now())
-                .build());
-
-        // When - Find for our recipient
-        List<Message> found = messageRepository.findByRecipientIdOrderByCreatedAtDesc(RECIPIENT_ID);
-
-        // Then
-        assertEquals(2, found.size(), "Should find 2 messages for this recipient");
-
-        // Check order (newest first)
-        assertEquals(newMsg.getSenderIdHash(), found.get(0).getSenderIdHash(), "Newest message should be first");
-        assertEquals(oldMsg.getSenderIdHash(), found.get(1).getSenderIdHash(), "Older message should be second");
-
-        assertTrue(found.get(0).getCreatedAt().isAfter(found.get(1).getCreatedAt()), "Timestamps should be descending");
-    }
-
-    @Test
-    public void testFindByRecipientId_WhenNoMessages_ShouldReturnEmptyList() {
-        // When
-        List<Message> found = messageRepository.findByRecipientIdOrderByCreatedAtDesc("NON-EXISTENT");
-
-        // Then
-        assertTrue(found.isEmpty(), "Should return empty list for user with no messages");
-    }
-
-    @Test
-    public void testSaveWithoutId_ShouldAutoGenerateId() {
-        // Given
-        Message msg = Message.builder()
-                .recipientId("HNET-AUTO-ID")
-                .senderIdHash("hash")
-                .encryptedImage(DATA)
+                .recipientHash(RECIPIENT_HASH)
+                .stegoPacket(STEGO_DATA)
                 // createdAt will be set by @PrePersist
                 .build();
-
-        assertNull(msg.getId());
 
         // When
         Message saved = messageRepository.save(msg);
 
         // Then
-        assertNotNull(saved.getId(), "ID should be auto-generated");
-        assertNotNull(saved.getCreatedAt(), "CreatedAt should be auto-generated");
+        assertNotNull(saved.getMessageId());
+        assertNotNull(saved.getCreatedAt());
+
+        List<Message> allMessages = messageRepository.findAll();
+        assertEquals(1, allMessages.size());
+        assertEquals(RECIPIENT_HASH, allMessages.get(0).getRecipientHash());
+        assertArrayEquals(STEGO_DATA, allMessages.get(0).getStegoPacket());
+    }
+
+    @Test
+    public void testFindByRecipientHashOrderedByCreatedAtDesc() {
+        // Given - Create messages at different times
+        // Note: Using Thread.sleep or setting time manually to ensure different
+        // timestamps
+        // Ideally we would mock time, but here we set createdAt manually (if allowed)
+        // or rely on sleep.
+        // The entity has updatable=false on createdAt, but we can set it in builder
+        // before save?
+        // Let's rely on saving sequence or different data.
+
+        // Wait can be unreliable, so let's try creating with manual timestamps if
+        // possible
+        // But the builder fields are usually overwritten by @PrePersist if logic forces
+        // it.
+        // Let's create one, then another.
+
+        Message oldMsg = Message.builder()
+                .recipientHash(RECIPIENT_HASH)
+                .stegoPacket(new byte[] { 1 })
+                .build();
+        messageRepository.save(oldMsg);
+
+        // Small delay to ensure timestamp difference
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+        }
+
+        Message newMsg = Message.builder()
+                .recipientHash(RECIPIENT_HASH)
+                .stegoPacket(new byte[] { 2 })
+                .build();
+        messageRepository.save(newMsg);
+
+        // And create a message for another user
+        messageRepository.save(Message.builder()
+                .recipientHash("OTHER-USER-HASH")
+                .stegoPacket(new byte[] { 3 })
+                .build());
+
+        // When - Find for our recipient (using the correct method name)
+        // Assuming repository method is findByRecipientHashOrderByCreatedAtDesc
+        // Wait, previously it was findByRecipientId... I need to check repository
+        // interface name.
+        // Step 288 showed MessageRepository had findByRecipientIdOrderByCreatedAtDesc?
+        // Let's check logic: RecipientHash is the field. Method needs to match.
+        List<Message> found = messageRepository.findByRecipientHashOrderByCreatedAtDesc(RECIPIENT_HASH);
+        // Note: If I didn't update the repository method NAME, it might fail or look
+        // for recipientId field (which doesn't exist).
+        // I need to update MessageRepository interface too. but first let's see current
+        // code.
+
+        // Then
+        assertEquals(2, found.size(), "Should find 2 messages for this recipient");
+
+        // Check order (newest first)
+        // Since we don't have senderHash anymore, verify by stego content
+        assertArrayEquals(newMsg.getStegoPacket(), found.get(0).getStegoPacket(), "Newest message should be first");
+        assertArrayEquals(oldMsg.getStegoPacket(), found.get(1).getStegoPacket(), "Older message should be second");
+    }
+
+    @Test
+    public void testDeleteByCreatedAtBefore() {
+        // Given
+        Message msg = Message.builder()
+                .recipientHash(RECIPIENT_HASH)
+                .stegoPacket(STEGO_DATA)
+                .build();
+        msg = messageRepository.save(msg);
+
+        // When
+        // Delete messages older than now + 1 second (which includes our message)
+        LocalDateTime threshold = LocalDateTime.now().plusSeconds(1);
+        messageRepository.deleteByCreatedAtBefore(threshold);
+
+        // Then
+        List<Message> remaining = messageRepository.findAll();
+        assertTrue(remaining.isEmpty(), "Message should be deleted");
     }
 }

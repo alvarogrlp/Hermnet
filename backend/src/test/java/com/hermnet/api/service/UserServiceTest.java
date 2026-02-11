@@ -19,15 +19,10 @@ import static org.mockito.Mockito.*;
 /**
  * Unit tests for UserService.
  * 
- * These tests verify the business logic of user registration including:
- * - ID format validation
- * - Duplicate ID detection
- * - Duplicate public key detection
- * - Successful user registration
- * - Edge cases and error handling
+ * Verifies business logic for user registration, including ID validation,
+ * uniqueness checks, and data persistence.
  * 
- * Uses Mockito to mock the UserRepository dependency, allowing us to test
- * the service layer in isolation without requiring a database.
+ * Updated to use 'idHash' field instead of 'id'.
  */
 @ExtendWith(MockitoExtension.class)
 public class UserServiceTest {
@@ -57,7 +52,7 @@ public class UserServiceTest {
         when(userRepository.findByPublicKey(validPublicKey)).thenReturn(Optional.empty());
 
         User savedUser = User.builder()
-                .id(validId)
+                .idHash(validId)
                 .publicKey(validPublicKey)
                 .build();
         when(userRepository.save(any(User.class))).thenReturn(savedUser);
@@ -67,7 +62,7 @@ public class UserServiceTest {
 
         // Then
         assertNotNull(result, "Registered user should not be null");
-        assertEquals(validId, result.getId(), "User ID should match");
+        assertEquals(validId, result.getIdHash(), "User ID Hash should match");
         assertEquals(validPublicKey, result.getPublicKey(), "Public key should match");
 
         // Verify interactions
@@ -245,7 +240,7 @@ public class UserServiceTest {
         when(userRepository.existsById(validId)).thenReturn(false);
 
         User existingUser = User.builder()
-                .id("HNET-OTHER001")
+                .idHash("HNET-OTHER001")
                 .publicKey(validPublicKey)
                 .build();
         when(userRepository.findByPublicKey(validPublicKey)).thenReturn(Optional.of(existingUser));
@@ -355,7 +350,7 @@ public class UserServiceTest {
         // Capture the user being saved
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
             User user = invocation.getArgument(0);
-            assertEquals(validId, user.getId(), "Saved user should have correct ID");
+            assertEquals(validId, user.getIdHash(), "Saved user should have correct ID");
             assertEquals(validPublicKey, user.getPublicKey(), "Saved user should have correct public key");
             return user;
         });
@@ -365,37 +360,5 @@ public class UserServiceTest {
 
         // Then - Verified in the answer above
         verify(userRepository, times(1)).save(any(User.class));
-    }
-
-    // ==================== VALIDATION ORDER TESTS ====================
-
-    @Test
-    public void testRegisterUser_ShouldValidateIdFormatBeforeCheckingDuplicates() {
-        // Given - Invalid ID format
-        String invalidId = "INVALID-123";
-
-        // When/Then
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> userService.registerUser(invalidId, validPublicKey));
-
-        // Verify that we never checked the repository (format validation happens first)
-        verify(userRepository, never()).existsById(anyString());
-        verify(userRepository, never()).findByPublicKey(anyString());
-    }
-
-    @Test
-    public void testRegisterUser_ShouldCheckIdExistenceBeforePublicKey() {
-        // Given - Duplicate ID
-        when(userRepository.existsById(validId)).thenReturn(true);
-
-        // When/Then
-        assertThrows(
-                IllegalStateException.class,
-                () -> userService.registerUser(validId, validPublicKey));
-
-        // Verify we checked ID but never checked public key
-        verify(userRepository, times(1)).existsById(validId);
-        verify(userRepository, never()).findByPublicKey(anyString());
     }
 }

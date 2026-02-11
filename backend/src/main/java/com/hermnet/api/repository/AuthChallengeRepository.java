@@ -14,19 +14,27 @@ import com.hermnet.api.model.User;
  * Provides methods to store, retrieve, and delete authentication challenges
  * (nonces).
  */
-public interface AuthChallengeRepository extends JpaRepository<AuthChallenge, String> {
+public interface AuthChallengeRepository extends JpaRepository<AuthChallenge, Long> {
 
+    /**
+     * Finds a challenge by its nonce string.
+     * 
+     * @param nonce The unique nonce string
+     * @return An Optional containing the challenge if found
+     */
     Optional<AuthChallenge> findByNonce(String nonce);
+
     /**
      * Deletes all challenges associated with a specific user.
      * 
-     * This is typically used to clean up old or unused challenges after a
-     * successful login
-     * or when a user session expires to maintain security hygiene.
-     * 
-     * @param user The user whose challenges should be deleted
+     * @param user The user entity (mapped to user_hash)
      */
-    void deleteByUser(User user);
+    void deleteByUserHash(User user);
 
-    void deleteByExpiresAtBefore(LocalDateTime now);
+    /**
+     * Deletes all challenges that have expired before the given time.
+     * 
+     * @param expiryDate The cutoff date/time
+     */
+    void deleteByExpiresAtBefore(LocalDateTime expiryDate);
 }

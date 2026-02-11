@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Unit tests for AuthChallenge entity.
  * 
  * Verifies builder functionality, expiration logic, and relationships.
+ * Updated to reflect: challengeId (Long), nonce (String), userHash (User).
  */
 public class AuthChallengeTest {
 
@@ -15,21 +16,22 @@ public class AuthChallengeTest {
     public void testBuilder() {
         // Given
         User user = new User();
-        user.setId("test-user");
+        user.setIdHash("test-user-hash");
         LocalDateTime expiry = LocalDateTime.now().plusMinutes(5);
-        String challengeStr = "random-nonce-123";
+        String nonce = "random-nonce-123";
 
         // When
         AuthChallenge challenge = AuthChallenge.builder()
-                .challenge(challengeStr)
-                .user(user)
+                .nonce(nonce)
+                .userHash(user)
                 .expiresAt(expiry)
                 .build();
 
         // Then
-        assertEquals(challengeStr, challenge.getChallenge());
-        assertEquals(user, challenge.getUser());
+        assertEquals(nonce, challenge.getNonce());
+        assertEquals(user, challenge.getUserHash());
         assertEquals(expiry, challenge.getExpiresAt());
+        assertNull(challenge.getChallengeId(), "ID should be null before persistence");
     }
 
     @Test
@@ -65,21 +67,40 @@ public class AuthChallengeTest {
 
         // Then
         assertNotNull(challenge);
-        assertNull(challenge.getChallenge());
+        assertNull(challenge.getNonce());
+        assertNull(challenge.getUserHash());
     }
 
     @Test
     public void testAllArgsConstructor() {
         // Given
+        Long id = 100L;
         User user = new User();
         LocalDateTime now = LocalDateTime.now();
+        String nonce = "nonce-val";
 
         // When
-        AuthChallenge challenge = new AuthChallenge("nonce", user, now);
+        AuthChallenge challenge = new AuthChallenge(id, nonce, user, now);
 
         // Then
-        assertEquals("nonce", challenge.getChallenge());
-        assertEquals(user, challenge.getUser());
+        assertEquals(id, challenge.getChallengeId());
+        assertEquals(nonce, challenge.getNonce());
+        assertEquals(user, challenge.getUserHash());
         assertEquals(now, challenge.getExpiresAt());
+    }
+
+    @Test
+    public void testSetters() {
+        // Given
+        AuthChallenge challenge = new AuthChallenge();
+        User user = new User();
+
+        // When
+        challenge.setNonce("new-nonce");
+        challenge.setUserHash(user);
+
+        // Then
+        assertEquals("new-nonce", challenge.getNonce());
+        assertEquals(user, challenge.getUserHash());
     }
 }

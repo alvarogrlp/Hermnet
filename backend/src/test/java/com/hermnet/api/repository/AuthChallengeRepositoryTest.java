@@ -17,7 +17,9 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Integration tests for AuthChallengeRepository.
  * 
- * Verifies storing, retrieving, deleting challenges, and custom query methods.
+ * Verifies storing, retrieving, deleting challenges (by user, by expiry), and
+ * custom query methods.
+ * Updated to reflect schema: ID=Long, nonce=String, user=userHash.
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -30,6 +32,7 @@ public class AuthChallengeRepositoryTest {
     private UserRepository userRepository;
 
     private User testUser;
+    private static final String NONCE_VAL = "random-nonce-123";
 
     @BeforeEach
     public void setUp() {
@@ -38,7 +41,7 @@ public class AuthChallengeRepositoryTest {
 
         // Create a test user
         testUser = User.builder()
-                .id("HNET-AUTH-USER")
+                .idHash("HNET-AUTH-USER")
                 .publicKey("some-auth-key")
                 .build();
         userRepository.save(testUser);
@@ -47,68 +50,104 @@ public class AuthChallengeRepositoryTest {
     @Test
     public void testSaveAndFindChallenge() {
         // Given
-        String nonce = "random-nonce-123";
         AuthChallenge challenge = AuthChallenge.builder()
-                .challenge(nonce)
-                .user(testUser)
+                .nonce(NONCE_VAL)
+                .userHash(testUser)
                 .expiresAt(LocalDateTime.now().plusMinutes(5))
                 .build();
 
         // When
-        challengeRepository.save(challenge);
+        AuthChallenge saved = challengeRepository.save(challenge);
 
         // Then
-        Optional<AuthChallenge> found = challengeRepository.findById(nonce);
-        assertTrue(found.isPresent(), "Should find saved challenge");
-        assertEquals(nonce, found.get().getChallenge());
-        assertEquals(testUser.getId(), found.get().getUser().getId());
+        assertNotNull(saved.getChallengeId());
+
+        // Find by ID
+        Optional<AuthChallenge> found = challengeRepository.findById(saved.getChallengeId());
+        assertTrue(found.isPresent(), "Should find saved challenge by ID");
+        assertEquals(NONCE_VAL, found.get().getNonce());
+        assertEquals(testUser.getIdHash(), found.get().getUserHash().getIdHash());
+
+        // Find by Nonce (custom method)
+        Optional<AuthChallenge> foundByNonce = challengeRepository.findByNonce(NONCE_VAL);
+        assertTrue(foundByNonce.isPresent(), "Should find saved challenge by Nonce");
+        assertEquals(saved.getChallengeId(), foundByNonce.get().getChallengeId());
     }
 
     @Test
-    public void testDeleteByUser() {
+    public void testDeleteByUserHash() {
         // Given - Create multiple challenges for the same user
-        AuthChallenge c1 = new AuthChallenge("nonce1", testUser, LocalDateTime.now().plusMinutes(5));
-        AuthChallenge c2 = new AuthChallenge("nonce2", testUser, LocalDateTime.now().plusMinutes(10));
+        AuthChallenge c1 = AuthChallenge.builder()
+                .nonce("nonce1")
+                .userHash(testUser)
+                .expiresAt(LocalDateTime.now().plusMinutes(5))
+                .build();
+        AuthChallenge c2 = AuthChallenge.builder()
+                .nonce("nonce2")
+                .userHash(testUser)
+                .expiresAt(LocalDateTime.now().plusMinutes(10))
+                .build();
         challengeRepository.saveAll(List.of(c1, c2));
 
         // And create a challenge for another user to ensure it's not deleted
-        User otherUser = userRepository.save(User.builder().id("HNET-OTHER").publicKey("other-key").build());
-        AuthChallenge c3 = new AuthChallenge("nonce3", otherUser, LocalDateTime.now().plusMinutes(5));
+        User otherUser = User.builder().idHash("HNET-OTHER").publicKey("other-key").build();
+        userRepository.save(otherUser);
+
+        AuthChallenge c3 = AuthChallenge.builder()
+                .nonce("nonce3")
+                .userHash(otherUser)
+                .expiresAt(LocalDateTime.now().plusMinutes(5))
+                .build();
         challengeRepository.save(c3);
 
         assertEquals(3, challengeRepository.count(), "Should have 3 challenges initially");
 
         // When - Delete challenges for the first user
-        challengeRepository.deleteByUser(testUser);
+        challengeRepository.deleteByUserHash(testUser);
 
         // Then
         assertEquals(1, challengeRepository.count(), "Should have 1 challenge remaining");
-        assertTrue(challengeRepository.existsById("nonce3"), "Other user's challenge should persist");
-        assertFalse(challengeRepository.existsById("nonce1"), "User's challenge should be deleted");
-        assertFalse(challengeRepository.existsById("nonce2"), "User's challenge should be deleted");
+        Optional<AuthChallenge> remaining = challengeRepository.findByNonce("nonce3");
+        assertTrue(remaining.isPresent(), "Other user's challenge should persist");
+        assertEquals("HNET-OTHER", remaining.get().getUserHash().getIdHash());
     }
 
     @Test
-    public void testDeleteByUser_WhenNoChallengesExist_ShouldNotThrowException() {
+    public void testDeleteByUserHash_WhenNoChallengesExist_ShouldNotThrowException() {
         // When/Then
-        assertDoesNotThrow(() -> challengeRepository.deleteByUser(testUser));
+        assertDoesNotThrow(() -> challengeRepository.deleteByUserHash(testUser));
     }
 
     @Test
-    public void testExpiredChallengePersistence() {
-        // Given - Save an expired challenge
-        String expiredNonce = "expired-nonce";
-        AuthChallenge expired = new AuthChallenge(
-                expiredNonce,
-                testUser,
-                LocalDateTime.now().minusMinutes(1));
-        challengeRepository.save(expired);
+    public void testDeleteByExpiresAtBefore() {
+        // Given - Create challenges with specific expiry times
+        LocalDateTime now = LocalDateTime.now();
 
-        // When
-        Optional<AuthChallenge> found = challengeRepository.findById(expiredNonce);
+        // Expired 1 hour ago
+        AuthChallenge expired = AuthChallenge.builder()
+                .nonce("expired")
+                .userHash(testUser)
+                .expiresAt(now.minusHours(1))
+                .build();
+
+        // Expires 1 hour in future
+        AuthChallenge active = AuthChallenge.builder()
+                .nonce("active")
+                .userHash(testUser)
+                .expiresAt(now.plusHours(1))
+                .build();
+
+        challengeRepository.saveAll(List.of(expired, active));
+
+        // When - Delete challenges older than current time
+        // Note: deleteByExpiresAtBefore(cutoff) removes entries where expiresAt <
+        // cutoff
+
+        challengeRepository.deleteByExpiresAtBefore(now);
 
         // Then
-        assertTrue(found.isPresent());
-        assertTrue(found.get().isExpired(), "Retrieved challenge should report itself as expired");
+        List<AuthChallenge> remaining = challengeRepository.findAll();
+        assertEquals(1, remaining.size());
+        assertEquals("active", remaining.get(0).getNonce());
     }
 }

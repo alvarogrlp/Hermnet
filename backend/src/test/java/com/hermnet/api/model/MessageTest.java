@@ -8,27 +8,27 @@ import static org.junit.jupiter.api.Assertions.*;
  * Unit tests for Message entity.
  * 
  * Verifies builder functionality, lifecycle callbacks, and edge cases.
+ * Updated to match the current entity structure (messageId, recipientHash,
+ * stegoPacket).
  */
 public class MessageTest {
 
     @Test
     public void testBuilder() {
         // Given
-        String recipient = "HNET-USER1";
-        String senderHash = "abcefg123hash";
-        byte[] content = new byte[] { 1, 2, 3 };
+        String recipientHash = "abcefg123hash-recipient";
+        byte[] stegoPacket = new byte[] { 1, 2, 3, 4, 5 };
 
         // When
         Message message = Message.builder()
-                .recipientId(recipient)
-                .senderIdHash(senderHash)
-                .encryptedImage(content)
+                .recipientHash(recipientHash)
+                .stegoPacket(stegoPacket)
                 .build();
 
         // Then
-        assertEquals(recipient, message.getRecipientId());
-        assertEquals(senderHash, message.getSenderIdHash());
-        assertArrayEquals(content, message.getEncryptedImage());
+        assertEquals(recipientHash, message.getRecipientHash());
+        assertArrayEquals(stegoPacket, message.getStegoPacket());
+        assertNull(message.getMessageId(), "ID should be null before persistence");
     }
 
     @Test
@@ -52,26 +52,25 @@ public class MessageTest {
 
         // Then
         assertNotNull(msg);
-        assertNull(msg.getRecipientId());
+        assertNull(msg.getRecipientHash());
+        assertNull(msg.getStegoPacket());
     }
 
     @Test
     public void testAllArgsConstructor() {
         // Given
-        long id = 1L;
-        String recipient = "HNET-USER1";
-        String senderHash = "abcefg123hash";
-        byte[] content = new byte[] { 1, 2, 3 };
+        Long id = 1L;
+        String recipientHash = "recipient-hash-123";
+        byte[] stegoPacket = new byte[] { 10, 20, 30 };
         LocalDateTime now = LocalDateTime.now();
 
         // When
-        Message msg = new Message(id, recipient, senderHash, content, now);
+        Message msg = new Message(id, recipientHash, stegoPacket, now);
 
         // Then
-        assertEquals(id, msg.getId());
-        assertEquals(recipient, msg.getRecipientId());
-        assertEquals(senderHash, msg.getSenderIdHash());
-        assertArrayEquals(content, msg.getEncryptedImage());
+        assertEquals(id, msg.getMessageId());
+        assertEquals(recipientHash, msg.getRecipientHash());
+        assertArrayEquals(stegoPacket, msg.getStegoPacket());
         assertEquals(now, msg.getCreatedAt());
     }
 
@@ -79,12 +78,17 @@ public class MessageTest {
     public void testGettersAndSetters() {
         // Given
         Message msg = new Message();
-        String recipient = "HNET-SETTER";
+        String recipientHash = "HNET-SETTER-HASH";
+        byte[] packet = new byte[] { 0, 1 };
 
         // When
-        msg.setRecipientId(recipient);
+        msg.setMessageId(100L);
+        msg.setRecipientHash(recipientHash);
+        msg.setStegoPacket(packet);
 
         // Then
-        assertEquals(recipient, msg.getRecipientId());
+        assertEquals(100L, msg.getMessageId());
+        assertEquals(recipientHash, msg.getRecipientHash());
+        assertArrayEquals(packet, msg.getStegoPacket());
     }
 }

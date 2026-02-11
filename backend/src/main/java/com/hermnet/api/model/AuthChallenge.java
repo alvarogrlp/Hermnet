@@ -7,11 +7,10 @@ import java.time.LocalDateTime;
 /**
  * Represents an authentication challenge for user login.
  * 
- * This entity stores a temporary challenge string (nonce) linked to a specific
- * user.
- * The user must sign this challenge with their private key to prove their
- * identity.
- * Challenges have an expiration time to prevent replay attacks.
+ * This mechanism prevents replay attacks by issuing a temporary, random nonce
+ * that the client must sign with their private key. The server verifies the
+ * signature
+ * against the stored public key to authenticate the session.
  */
 @Entity
 @Table(name = "auth_challenges")
@@ -22,20 +21,21 @@ import java.time.LocalDateTime;
 @Builder
 public class AuthChallenge {
 
-    /**
-     * The unique challenge string (nonce).
-     * Used as the Primary Key.
-     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "challenge_id")
     private Long challengeId;
 
+    /**
+     * The random cryptographic nonce to be signed by the client.
+     */
     @Column(name = "nonce", nullable = false, length = 64)
     private String nonce;
 
     /**
      * The user associated with this challenge.
+     * 
+     * Foreign key constraint linking to the user's ID hash.
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_hash", referencedColumnName = "id_hash", nullable = false)
