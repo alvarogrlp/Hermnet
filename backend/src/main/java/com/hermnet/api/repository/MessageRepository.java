@@ -1,5 +1,6 @@
 package com.hermnet.api.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -25,4 +26,6 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
      * @return A list of messages for the recipient, ordered by createdAt descending
      */
     List<Message> findByRecipientIdOrderByCreatedAtDesc(String recipientId);
+
+    void deleteByCreatedAtBefore(LocalDateTime expiryDate);
 }

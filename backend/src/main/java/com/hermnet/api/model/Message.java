@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
  * and sender verification (sender ID hash), but never the plaintext content.
  */
 @Entity
-@Table(name = "mailbox")
+@Table(name = "mailbox", indexes = { @Index(name = "idx_mailbox_recipient", columnList = "recipient_hash") })
 @Getter
 @Setter
 @AllArgsConstructor
@@ -29,33 +29,17 @@ public class Message {
      * The ID of the user who will receive this message.
      * This field is used for routing the message to the correct mailbox.
      */
-    @Column(name = "recipient_id", length = 64, nullable = false)
-    private String recipientId;
+    @Column(name = "recipient_hash", length = 64, nullable = false)
+    private String recipientHash;
 
-    /**
-     * A hash of the sender's ID.
-     * 
-     * The sender's ID is hashed to prevent the server from easily mapping
-     * communication patterns (who is talking to whom) while still allowing
-     * basic rate limiting or blocking if needed.
-     */
-    @Column(name = "sender_id_hash", length = 64, nullable = false)
-    private String senderIdHash;
-
-    /**
-     * The encrypted content of the message.
-     * 
-     * This binary large object (BLOB) contains the image/message encrypted
-     * with the recipient's public key. The server cannot decrypt this.
-     */
     @Lob
     @Column(name = "stego_packet", nullable = false)
-    private byte[] encryptedImage;
+    private byte[] stegoPacket;
 
     /**
      * Timestamp when the message was received by the server.
      */
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     /**
