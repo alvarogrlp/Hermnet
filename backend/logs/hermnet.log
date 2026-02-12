@@ -436,3 +436,12 @@ This generated password is for development use only. Your security configuration
 2026-02-12 11:47:56 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
 2026-02-12 11:47:56 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-2 - Shutdown initiated...
 2026-02-12 11:47:56 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-2 - Shutdown completed.
+2026-02-12 11:57:07 [main] INFO  c.h.a.c.MessageControllerTest - Starting MessageControllerTest using Java 21.0.6 with PID 6852 (started by alvar in C:\Users\alvar\Desktop\Hermnet\backend)
+2026-02-12 11:57:07 [main] INFO  c.h.a.c.MessageControllerTest - No active profile set, falling back to 1 default profile: "default"
+2026-02-12 11:57:11 [main] WARN  o.s.b.a.s.s.UserDetailsServiceAutoConfiguration - 
+
+Using generated security password: e0d648e4-c9f3-4ffd-92b0-6945950e32c0
+
+This generated password is for development use only. Your security configuration must be updated before running your application in production.
+
+2026-02-12 11:57:11 [main] INFO  c.h.a.c.MessageControllerTest - Started MessageControllerTest in 4.542 seconds (process running for 6.054)
