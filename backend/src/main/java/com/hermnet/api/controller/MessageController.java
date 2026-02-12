@@ -2,7 +2,9 @@ package com.hermnet.api.controller;
 
 import com.hermnet.api.dto.SendMessageRequest;
 import com.hermnet.api.model.Message;
+import com.hermnet.api.model.User;
 import com.hermnet.api.repository.MessageRepository;
+import com.hermnet.api.repository.UserRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +25,8 @@ import java.util.stream.Collectors;
 public class MessageController {
 
     private final MessageRepository messageRepository;
+    private final UserRepository userRepository;
+    private final com.hermnet.api.service.NotificationService notificationService;
 
     /**
      * Sends a secure message to a recipient.
@@ -41,6 +45,11 @@ public class MessageController {
                 .build();
 
         messageRepository.save(message);
+
+        // Trigger silent push notification
+        userRepository.findById(request.recipientId())
+                .map(User::getPushToken)
+                .ifPresent(notificationService::sendSyncNotification);
 
         return ResponseEntity.accepted().build();
     }
