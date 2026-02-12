@@ -4,15 +4,33 @@ import com.hermnet.api.dto.RegisterRequest;
 import com.hermnet.api.dto.UserResponse;
 import com.hermnet.api.model.User;
 import com.hermnet.api.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service layer for managing User operations.
+ * 
+ * Handles business logic for user registration, including checking for duplicate IDs.
+ * Format validation (HNET prefix) is handled by the Controller layer via DTO annotations.
+ */
 @Service
-@RequiredArgsConstructor
 public class UserService {
 
     private final UserRepository userRepository;
 
+    public UserService(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
+
+    /**
+     * Registers a new user.
+     * 
+     * Creates a new User entity from the provided request data and persists it to the database.
+     * Checks if the user ID already exists before saving to prevent duplicates.
+     * 
+     * @param request The registration request containing user details (ID, public key, push token).
+     * @return A UserResponse DTO with the registered user's details.
+     * @throws IllegalArgumentException if the user ID is already in use.
+     */
     public UserResponse register(RegisterRequest request) {
         if (userRepository.existsById(request.id())) {
             throw new IllegalArgumentException("El ID ya está en uso.");
