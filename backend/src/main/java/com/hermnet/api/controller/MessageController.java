@@ -33,6 +33,8 @@ public class MessageController {
      * 
      * Stores the encrypted steganographic image in the recipient's mailbox.
      * The server does not know the sender or the content.
+     * Triggers a silent "Data-Only" push notification (FCM) to the recipient
+     * to initiate background synchronization.
      * 
      * @param request The message request containing recipient ID and stego image.
      * @return 202 Accepted if the message is successfully queued/stored.
